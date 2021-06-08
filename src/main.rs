@@ -1,39 +1,15 @@
 use std::io::Write;
 use std::io::Read;
+use std::os::unix::fs::MetadataExt;
 
 struct Header {
     name: String,
     mode: String,
-    uid: u16,
-    gid: u16,
+    uid: u32,
+    gid: u32,
     mtime: u64,
-    checksum: u16,
     typeflag: [char; 1],
-    // linkname: [char; 100],
-    // magic: [char; 6],
-    // version: [char; 2],
-    uname: String,
-    gname: String,
-    // devmajor: [char; 8],
-    // devminor: [char; 8],
-    // prefix: [char; 155],
-    // pad: [char; 12]
-    // mode: [char; 8],
-    // uid: [char; 8],
-    // gid: [char; 8],
-    // size: [char; 12],
-    // mtime: [char; 12],
-    // checksum: [char; 8],
-    // typeflag: [char; 1],
-    // linkname: [char; 100],
-    // magic: [char; 6],
-    // version: [char; 2],
-    // uname: [char; 32],
-    // gname: [char; 32],
-    // devmajor: [char; 8],
-    // devminor: [char; 8],
-    // prefix: [char; 155],
-    // pad: [char; 12]
+    size: u64
 }
 
 
@@ -44,15 +20,16 @@ fn octal(n: u64, pad: usize) -> String {
 
 // TODO: typeflag
 fn generate_header(path: &std::path::Path, typeflag: [char; 1]) -> Header {
+    let meta = std::fs::metadata(path).unwrap();
+
     Header {
         name: path.to_str().unwrap().to_string(),
-        mode: String::from("0000777\0"),  // TODO
-        uid: 1000, gid: 1000,  // TODO
-        mtime: 114514,  // TODO
+        mode: format!("{:0>7}\0", format!("{:o}", meta.mode())),
+        uid: meta.uid(),
+        gid: meta.uid(),
+        mtime: meta.mtime().unsigned_abs(),
         typeflag: typeflag,
-        checksum: 0,
-        uname: "nanoha".to_string(),  // TODO
-        gname: "nanoha".to_string()  // TODO
+        size: meta.len()
     }
 }
 
@@ -78,7 +55,6 @@ fn write_padding(f: &mut std::io::BufWriter<std::fs::File>, len: usize) {
 
 
 fn write_header(f: &mut std::io::BufWriter<std::fs::File>, h: &Header) {
-    let null_char = "\0".as_bytes();
     let is_file = h.typeflag[0] == '0';
 
     let mut header_bytes: std::vec::Vec<u8> = std::vec::Vec::new();
@@ -93,10 +69,8 @@ fn write_header(f: &mut std::io::BufWriter<std::fs::File>, h: &Header) {
     header_bytes.append(&mut format!("{}\0", octal(h.uid.into(), 8 - 1)).into_bytes());
     header_bytes.append(&mut format!("{}\0", octal(h.gid.into(), 8 - 1)).into_bytes());
 
-    // TODO: size: \0で終はる サイズ12
-    // ディレクトリのsizeは0
-    let size = if is_file {13} else {0};
-    header_bytes.append(&mut format!("{}\0", octal(size, 12 - 1)).into_bytes());
+    // size: \0で終はる サイズ12
+    header_bytes.append(&mut format!("{}\0", octal(h.size, 12 - 1)).into_bytes());
 
     // mtime: \0で終はる サイズ12
     header_bytes.append(&mut format!("{}\0", octal(h.mtime.into(), 12 - 1)).into_bytes());
@@ -116,9 +90,10 @@ fn write_header(f: &mut std::io::BufWriter<std::fs::File>, h: &Header) {
     header_bytes.append(&mut vec![' ' as u8, '\0' as u8]);
 
     // uname, gname
-    header_bytes.append(&mut format!("{:\0<32}", String::from(&h.uname)).into_bytes());
-    header_bytes.append(&mut format!("{:\0<32}", String::from(&h.gname)).into_bytes());
-
+    // header_bytes.append(&mut format!("{:\0<32}", String::from(&h.uname)).into_bytes());
+    // header_bytes.append(&mut format!("{:\0<32}", String::from(&h.gname)).into_bytes());
+    header_bytes.append(&mut std::iter::repeat(0).take(32).collect::<std::vec::Vec<u8>>());
+    header_bytes.append(&mut std::iter::repeat(0).take(32).collect::<std::vec::Vec<u8>>());
 
     // devmajor, devminor
     header_bytes.append(&mut std::iter::repeat(0).take(8).collect::<std::vec::Vec<u8>>());
