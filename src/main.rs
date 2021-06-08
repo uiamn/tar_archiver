@@ -55,8 +55,6 @@ fn write_padding(f: &mut std::io::BufWriter<std::fs::File>, len: usize) {
 
 
 fn write_header(f: &mut std::io::BufWriter<std::fs::File>, h: &Header) {
-    let is_file = h.typeflag[0] == '0';
-
     let mut header_bytes: std::vec::Vec<u8> = std::vec::Vec::new();
 
     // name: \0で終はる
@@ -77,33 +75,33 @@ fn write_header(f: &mut std::io::BufWriter<std::fs::File>, h: &Header) {
 
     // checksumは空白で埋まってゐると仮定して計算する
     // サイズ8 null+空白で終はる
-    header_bytes.append(&mut vec![' ' as u8, ' ' as u8, ' ' as u8, ' ' as u8, ' ' as u8, ' ' as u8, ' ' as u8, ' ' as u8]);
+    header_bytes.append(&mut vec![' ' as u8; 8]);
 
     // typeflag
     header_bytes.append(&mut vec![h.typeflag[0] as u8]);
 
     // linkname
-    header_bytes.append(&mut std::iter::repeat(0).take(100).collect::<std::vec::Vec<u8>>());
+    header_bytes.append(&mut vec![0; 100]);
 
     // magic, version
     header_bytes.append(&mut vec!['u' as u8, 's' as u8, 't' as u8, 'a' as u8, 'r' as u8, ' ' as u8]);
     header_bytes.append(&mut vec![' ' as u8, '\0' as u8]);
 
     // uname, gname
-    // header_bytes.append(&mut format!("{:\0<32}", String::from(&h.uname)).into_bytes());
-    // header_bytes.append(&mut format!("{:\0<32}", String::from(&h.gname)).into_bytes());
-    header_bytes.append(&mut std::iter::repeat(0).take(32).collect::<std::vec::Vec<u8>>());
-    header_bytes.append(&mut std::iter::repeat(0).take(32).collect::<std::vec::Vec<u8>>());
+    header_bytes.append(&mut vec![0; 32]);
+    header_bytes.append(&mut vec![0; 32]);
+
 
     // devmajor, devminor
-    header_bytes.append(&mut std::iter::repeat(0).take(8).collect::<std::vec::Vec<u8>>());
-    header_bytes.append(&mut std::iter::repeat(0).take(8).collect::<std::vec::Vec<u8>>());
+    header_bytes.append(&mut vec![0; 8]);
+    header_bytes.append(&mut vec![0; 8]);
+
 
     // prefix
-    header_bytes.append(&mut std::iter::repeat(0).take(155).collect::<std::vec::Vec<u8>>());
+    header_bytes.append(&mut vec![0; 155]);
 
     // padding
-    header_bytes.append(&mut std::iter::repeat(0).take(12).collect::<std::vec::Vec<u8>>());
+    header_bytes.append(&mut vec![0; 12]);
 
     // calc checksum
     let mut checksum: u32 = 0;
@@ -131,7 +129,7 @@ fn generate_tar_file(dist: &str, headers: Vec<Header>) {
             let _ = rf.read_to_end(&mut buf);
             f.write_all(&buf).unwrap();
 
-            write_padding(&mut f, 512 - 13);
+            write_padding(&mut f, 512usize - (&header.size % 512) as usize);
         }
     }
 
